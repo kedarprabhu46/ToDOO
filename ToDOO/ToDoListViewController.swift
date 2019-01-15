@@ -10,9 +10,15 @@ import UIKit
 
 class ToDoListViewController: UITableViewController {
 
-    let itemArray=["item 1","item 2","item 3"]
+    var itemArray=[String]()
+    let defaults = UserDefaults.standard
+    
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        if let item = defaults.array(forKey: "ToDoListArray") as? [String]{
+            itemArray=item
+        }
         // Do any additional setup after loading the view, typically from a nib.
         
         
@@ -46,6 +52,33 @@ class ToDoListViewController: UITableViewController {
         // Dispose of any resources that can be recreated.
     }
 
-
+    @IBAction func addButtonPressed(_ sender: UIBarButtonItem) {
+        var textField=UITextField()
+        
+        let uiAlertController=UIAlertController(title: "Add new item", message: "", preferredStyle: .alert)
+        let uiAlertAction=UIAlertAction.init(title: "Add", style: .default) { (AlertAction) in
+            print(textField.text!)
+            if textField.text==""{
+                let errorAlertController=UIAlertController(title: "No item entered", message: "Enter an item", preferredStyle: UIAlertControllerStyle.alert)
+                let errorAction=UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
+                errorAlertController.addAction(errorAction)
+                self.present(errorAlertController, animated: true, completion: nil)
+            }
+            else{
+            self.itemArray.append(textField.text!)
+                
+                self.defaults.set(self.itemArray, forKey: "ToDoListArray")
+            self.tableView.reloadData()
+            }
+        }
+        uiAlertController.addTextField { (AlertTextField) in
+            AlertTextField.placeholder="Enter new item"
+            textField=AlertTextField
+        }
+        uiAlertController.addAction(uiAlertAction)
+        self.present(uiAlertController, animated: true, completion: nil)
+        
+    }
+    
 }
 
