@@ -7,24 +7,31 @@
 //
 
 import UIKit
-import CoreData
+import RealmSwift
 
 class ToDoListViewController: UITableViewController {
 
-    var itemArray=[Item]()
+    var itemArray:Results<Item>?
     var selectedCategory:Category?{
         didSet{
             loadData()
         }
     }
+ 
+    let realm=try? Realm()
+    
+    
+    
     @IBOutlet weak var searchBar: UISearchBar!
     
+   
     
-    let context=(UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     override func viewDidLoad() {
         super.viewDidLoad()
         print(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask))
         searchBar.delegate=self
+        
+        
         //searchBar.showsCancelButton=true
        // loadData()
         // Do any additional setup after loading the view, typically from a nib.
@@ -33,13 +40,13 @@ class ToDoListViewController: UITableViewController {
     }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemArray.count
+        return itemArray?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell=tableView.dequeueReusableCell(withIdentifier: "ToDoItemCell", for: indexPath)
-        cell.textLabel?.text=itemArray[indexPath.row].title
-        if itemArray[indexPath.row].done==true{
+        cell.textLabel?.text=itemArray?[indexPath.row].name ?? ""
+        if itemArray?[indexPath.row].done==true{
             cell.accessoryType = .checkmark
         }
         else{
@@ -49,20 +56,21 @@ class ToDoListViewController: UITableViewController {
     }
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        print(itemArray[(indexPath.row)])
+        print(itemArray![(indexPath.row)])
         
-//        context.delete(itemArray[indexPath.row])
-//        itemArray.remove(at: indexPath.row)
-        
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
-        saveItems()
-//        if tableView.cellForRow(at: indexPath)?.accessoryType == .checkmark {
-//        tableView.cellForRow(at: indexPath)?.accessoryType = .none
-//        }
-//        else{
-//            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-//        }
-        
+        if let item=itemArray?[indexPath.row]
+        {
+            do{
+                try realm?.write {
+                    item.done = !item.done
+                }
+            }
+            catch{
+                
+            }
+            
+        }
+        tableView.reloadData()
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -86,15 +94,21 @@ class ToDoListViewController: UITableViewController {
             }
             else{
                 
-                let newItem=Item(context: self.context)
-            newItem.title=textField.text!
+                do{
+                    try self.realm?.write{
+                let newItem=Item()
                 newItem.done=false
-                newItem.parentCategory=self.selectedCategory
-            self.itemArray.append(newItem)
+                newItem.name=textField.text!
+                self.selectedCategory?.items.append(newItem)
+                    }
+                }
+                catch{
+                    
+                }
                 
-                self.saveItems()
-            self.tableView.reloadData()
-                print(self.itemArray)
+                
+                self.tableView.reloadData()
+//                print(self.itemArray)
             }
         }
         uiAlertController.addTextField { (AlertTextField) in
@@ -105,66 +119,38 @@ class ToDoListViewController: UITableViewController {
         self.present(uiAlertController, animated: true, completion: nil)
         
     }
-    func saveItems()
-    {
-       do{
-            try context.save()
-        }
-        catch{
-            print(error)
-        }
-        tableView.reloadData()
-    }
-    
+
     func loadData(){
-        let request: NSFetchRequest<Item>=Item.fetchRequest()
-        request.predicate=NSPredicate.init(format: "parentCategory.name == %@", selectedCategory!.name!)
-        do{
-            itemArray=try context.fetch(request)
-        }
-        catch{
-            print("fetch error\(error)")
-        }
+        itemArray=selectedCategory?.items.sorted(byKeyPath: "name", ascending: true)
+        tableView.reloadData()
     }
     
     
 }
 
 extension ToDoListViewController:UISearchBarDelegate{
-    
-    
-    
+
+
+
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         print("search clicked")
-        let request:NSFetchRequest<Item>=Item.fetchRequest()
-        
-        let predicateCategory=NSPredicate(format: "parentCategory.name == %@", selectedCategory!.name!)
-        let predicateSearch = NSPredicate(format: "title CONTAINS[c] %@", searchBar.text!)
-        
-        let compoundPred = NSCompoundPredicate(andPredicateWithSubpredicates: [predicateCategory,predicateSearch])
-        request.predicate=compoundPred
-        
-        
-        request.sortDescriptors=[NSSortDescriptor(key: "title", ascending: true)]
-        
-        do{
-            itemArray = try context.fetch(request)
-        }
-        catch{
-            
-        }
+
+//        itemArray = itemArray?.filter(NSPredicate(format: "name CONTAINS[c] %@", searchBar.text!)).sorted(byKeyPath: "name", ascending: true)
+        itemArray = itemArray?.filter(NSPredicate(format: "name CONTAINS[c] %@", searchBar.text!)).sorted(byKeyPath: "dateCreated", ascending: true)
         tableView.reloadData()
-        
+
     }
-    
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if searchBar.text?.count==0{
-            loadData()
             
+            print("clear text clicked")
+            loadData()
+
             DispatchQueue.main.async {
                 searchBar.resignFirstResponder()
             }
-            
+
         }
     }
 }
